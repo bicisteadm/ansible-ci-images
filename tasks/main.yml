@@ -43,7 +43,7 @@
 
 - name: Copy helper scripts to target
   copy:
-    src: "{{ role_path }}/runner-images/images/ubuntu/scripts/helpers/"
+    src: "{{ runner_images_helpers_src }}"
     dest: "{{ helper_script_folder }}/"
     mode: '0755'
 
@@ -98,7 +98,7 @@
 
 - name: Copy build scripts to installer folder
   copy:
-    src: "{{ role_path }}/runner-images/images/ubuntu/scripts/build/"
+    src: "{{ runner_images_build_src }}"
     dest: "{{ installer_script_folder }}/"
     mode: '0755'
 
@@ -119,20 +119,20 @@
 
 - name: Copy post-generation assets
   copy:
-    src: "{{ role_path }}/runner-images/images/ubuntu/assets/post-gen/"
+    src: "{{ runner_images_post_gen_src }}"
     dest: "{{ image_folder }}/post-gen/"
     mode: '0755'
   ignore_errors: true
 
 - name: Copy test scripts
   copy:
-    src: "{{ role_path }}/runner-images/images/ubuntu/scripts/tests/"
+    src: "{{ runner_images_tests_src }}"
     dest: "{{ image_folder }}/tests/"
     mode: '0755'
 
 - name: Copy docs generation scripts
   copy:
-    src: "{{ role_path }}/runner-images/images/ubuntu/scripts/docs-gen/"
+    src: "{{ runner_images_docs_gen_src }}"
     dest: "{{ image_folder }}/docs-gen/"
     mode: '0755'
   ignore_errors: true
@@ -144,7 +144,7 @@
 
 - name: Copy software report base
   copy:
-    src: "{{ role_path }}/runner-images/helpers/software-report-base/"
+    src: "{{ runner_images_software_report_src }}"
     dest: "{{ image_folder }}/docs-gen/"
     mode: '0755'
   ignore_errors: true
@@ -156,7 +156,7 @@
 
 - name: Copy toolset configuration
   copy:
-    src: "{{ role_path }}/runner-images/images/ubuntu/toolsets/toolset-2204.json"
+    src: "{{ runner_images_toolset_src }}"
     dest: "{{ installer_script_folder }}/toolset.json"
     mode: '0644'
 
@@ -879,7 +879,7 @@
 
 - name: Copy machine instance configuration
   copy:
-    src: "{{ role_path }}/runner-images/images/ubuntu/assets/ubuntu2204.conf"
+    src: "{{ runner_images_ubuntu_conf_src }}"
     dest: "/etc/vsts/machine_instance.conf"
     mode: '0644'
   ignore_errors: true
@@ -920,5 +920,5 @@
       Toolcache Directory: {{ toolcache_root }}
       
       All selected installation scripts have been executed following the exact Packer sequence.
-      Scripts are sourced from official runner-images git submodule.
+      Scripts are sourced from official runner-images git submodule using clean variables.
       Reports have been generated and fetched to the control machine. 

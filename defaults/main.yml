@@ -16,6 +16,23 @@ debian_frontend: "noninteractive"
 dockerhub_login: ""
 dockerhub_password: ""
 
+# ========================================
+# Runner Images Submodule Paths
+# ========================================
+# Base paths to runner-images submodule content
+runner_images_base: "{{ role_path }}/runner-images"
+runner_images_ubuntu: "{{ runner_images_base }}/images/ubuntu"
+
+# Source paths for copying files from submodule
+runner_images_helpers_src: "{{ runner_images_ubuntu }}/scripts/helpers/"
+runner_images_build_src: "{{ runner_images_ubuntu }}/scripts/build/"
+runner_images_tests_src: "{{ runner_images_ubuntu }}/scripts/tests/"
+runner_images_docs_gen_src: "{{ runner_images_ubuntu }}/scripts/docs-gen/"
+runner_images_post_gen_src: "{{ runner_images_ubuntu }}/assets/post-gen/"
+runner_images_toolset_src: "{{ runner_images_ubuntu }}/toolsets/toolset-2204.json"
+runner_images_ubuntu_conf_src: "{{ runner_images_ubuntu }}/assets/ubuntu2204.conf"
+runner_images_software_report_src: "{{ runner_images_base }}/helpers/software-report-base/"
+
 # Control what gets installed with these boolean flags
 install_basic_packages: true
 install_ci_cd_tools: true
