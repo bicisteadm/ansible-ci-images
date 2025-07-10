@@ -10,6 +10,15 @@
     path: /etc/default
     state: directory
     mode: '0755'
+
+- name: Create fake motd-news configuration
+  copy:
+    content: |
+      # Fake motd-news configuration for LXC compatibility
+      # This file is created to prevent scripts from failing
+      ENABLED=0
+    dest: /etc/default/motd-news
+    mode: '0644'
     
 - name: Create fake cloud-init templates directory
   file:

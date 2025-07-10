@@ -49,18 +49,27 @@
 # ========================================
 
 - name: Configure APT mock
-  shell: "{{ installer_script_folder }}/configure-apt-mock.sh"
+  shell: "{{ installer_script_folder }}/configure-apt-mock.sh < /dev/null"
 
 # ========================================
 # Provisioner 4: APT configuration scripts
 # (shell: install-ms-repos, configure-apt-sources, configure-apt)
 # ========================================
 
-- name: Configure APT repositories and settings
-  shell: |
-    {{ installer_script_folder }}/install-ms-repos.sh
-    {{ installer_script_folder }}/configure-apt-sources.sh  
-    {{ installer_script_folder }}/configure-apt.sh
+- name: Install Microsoft repositories
+  shell: "{{ installer_script_folder }}/install-ms-repos.sh < /dev/null"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    DEBIAN_FRONTEND: "noninteractive"
+
+- name: Configure APT sources
+  shell: "{{ installer_script_folder }}/configure-apt-sources.sh < /dev/null"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    DEBIAN_FRONTEND: "noninteractive"
+
+- name: Configure APT settings
+  shell: "{{ installer_script_folder }}/configure-apt.sh < /dev/null"
   environment:
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
     DEBIAN_FRONTEND: "noninteractive"
@@ -71,7 +80,7 @@
 # ========================================
 
 - name: Configure system limits
-  shell: "{{ installer_script_folder }}/configure-limits.sh"
+  shell: "{{ installer_script_folder }}/configure-limits.sh < /dev/null"
 
 # ========================================
 # Provisioner 6: Copy build scripts
@@ -140,7 +149,7 @@
 # ========================================
 
 - name: Configure image data
-  shell: "{{ installer_script_folder }}/configure-image-data.sh"
+  shell: "{{ installer_script_folder }}/configure-image-data.sh < /dev/null"
   environment:
     IMAGE_VERSION: "{{ image_version }}"
     IMAGEDATA_FILE: "{{ image_folder }}/imagedata.json"
@@ -150,8 +159,19 @@
 # (shell: configure-environment.sh)
 # ========================================
 
+- name: Debug - Check if motd-news file exists
+  stat:
+    path: /etc/default/motd-news
+  register: motd_news_stat
+  
+- name: Debug - Display motd-news file status
+  debug:
+    msg: 
+      - "motd-news file exists: {{ motd_news_stat.stat.exists }}"
+      - "motd-news file path: {{ motd_news_stat.stat.path | default('N/A') }}"
+
 - name: Configure environment
-  shell: "{{ installer_script_folder }}/configure-environment.sh"
+  shell: "{{ installer_script_folder }}/configure-environment.sh < /dev/null"
   environment:
     IMAGE_VERSION: "{{ image_version }}"
     IMAGE_OS: "{{ image_os }}"
@@ -163,7 +183,7 @@
 # ========================================
 
 - name: Install vital APT packages
-  shell: "{{ installer_script_folder }}/install-apt-vital.sh"
+  shell: "{{ installer_script_folder }}/install-apt-vital.sh < /dev/null"
   environment:
     DEBIAN_FRONTEND: "noninteractive"
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
@@ -175,7 +195,7 @@
 # ========================================
 
 - name: Install PowerShell
-  shell: "{{ installer_script_folder }}/install-powershell.sh"
+  shell: "{{ installer_script_folder }}/install-powershell.sh < /dev/null"
   environment:
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
     INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
@@ -192,6 +212,8 @@
   environment:
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
     INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+  args:
+    stdin: /dev/null
 
 # ========================================
 # Provisioner 16: MASSIVE installation block
@@ -266,6 +288,8 @@
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
     INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
     DEBIAN_FRONTEND: "noninteractive"
+  args:
+    stdin: /dev/null
 
 # ========================================
 # Provisioner 17: Install Docker (with credentials)
@@ -273,7 +297,7 @@
 # ========================================
 
 - name: Install Docker
-  shell: "{{ installer_script_folder }}/install-docker.sh"
+  shell: "{{ installer_script_folder }}/install-docker.sh < /dev/null"
   environment:
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
     INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
@@ -287,11 +311,13 @@
 
 - name: Configure PowerShell toolset
   shell: |
-    pwsh -f {{ installer_script_folder }}/Install-Toolset.ps1
-    pwsh -f {{ installer_script_folder }}/Configure-Toolset.ps1
+    pwsh -f {{ installer_script_folder }}/Install-Toolset.ps1 < /dev/null
+    pwsh -f {{ installer_script_folder }}/Configure-Toolset.ps1 < /dev/null
   environment:
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
     INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    AGENT_TOOLSDIRECTORY: "/opt/hostedtoolcache"
+    SUDO_USER: "{{ ansible_user_id | default('root') }}"
 
 # ========================================
 # Provisioner 19: Install pipx packages
@@ -299,7 +325,7 @@
 # ========================================
 
 - name: Install pipx packages
-  shell: "{{ installer_script_folder }}/install-pipx-packages.sh"
+  shell: "{{ installer_script_folder }}/install-pipx-packages.sh < /dev/null"
   environment:
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
     INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
@@ -310,7 +336,7 @@
 # ========================================
 
 - name: Install Homebrew
-  shell: "{{ installer_script_folder }}/install-homebrew.sh"
+  shell: "{{ installer_script_folder }}/install-homebrew.sh < /dev/null"
   environment:
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
     DEBIAN_FRONTEND: "noninteractive"
@@ -323,7 +349,7 @@
 # ========================================
 
 - name: Configure snap
-  shell: "{{ installer_script_folder }}/configure-snap.sh"
+  shell: "{{ installer_script_folder }}/configure-snap.sh < /dev/null"
   environment:
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
 
@@ -346,7 +372,7 @@
     seconds: 60
 
 - name: Run cleanup
-  shell: "{{ installer_script_folder }}/cleanup.sh"
+  shell: "{{ installer_script_folder }}/cleanup.sh < /dev/null"
 
 # ========================================
 # Provisioner 24: Generate software reports
@@ -360,6 +386,8 @@
   environment:
     IMAGE_VERSION: "{{ image_version }}"
     INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+  args:
+    stdin: /dev/null
 
 # ========================================
 # Provisioner 25-26: Download reports
@@ -384,7 +412,7 @@
 # ========================================
 
 - name: Configure system
-  shell: "{{ installer_script_folder }}/configure-system.sh"
+  shell: "{{ installer_script_folder }}/configure-system.sh < /dev/null"
   environment:
     HELPER_SCRIPT_FOLDER: "{{ helper_script_folder }}"
     INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
@@ -410,6 +438,8 @@
   shell: |
     mkdir -p /etc/vsts
     cp /tmp/ubuntu2204.conf /etc/vsts/machine_instance.conf
+  args:
+    stdin: /dev/null
 
 # ========================================
 # Provisioner 30: Post-build validation
@@ -417,7 +447,7 @@
 # ========================================
 
 - name: Run post-build validation
-  shell: "{{ installer_script_folder }}/post-build-validation.sh"
+  shell: "{{ installer_script_folder }}/post-build-validation.sh < /dev/null"
   environment:
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
 
