@@ -33,12 +33,23 @@
     mode: '0755'
 
 # ========================================
+# Provisioner 2.5: Copy build scripts EARLY
+# (file: build -> installer_script_folder)
+# ========================================
+
+- name: Copy build scripts to installer folder
+  copy:
+    src: "{{ runner_images_build_src }}"
+    dest: "{{ installer_script_folder }}/"
+    mode: '0755'
+
+# ========================================
 # Provisioner 3: Configure APT mock
 # (shell: configure-apt-mock.sh)
 # ========================================
 
 - name: Configure APT mock
-  shell: "{{ runner_images_build_src }}/configure-apt-mock.sh"
+  shell: "{{ installer_script_folder }}/configure-apt-mock.sh"
 
 # ========================================
 # Provisioner 4: APT configuration scripts
@@ -47,9 +58,9 @@
 
 - name: Configure APT repositories and settings
   shell: |
-    {{ runner_images_build_src }}/install-ms-repos.sh
-    {{ runner_images_build_src }}/configure-apt-sources.sh  
-    {{ runner_images_build_src }}/configure-apt.sh
+    {{ installer_script_folder }}/install-ms-repos.sh
+    {{ installer_script_folder }}/configure-apt-sources.sh  
+    {{ installer_script_folder }}/configure-apt.sh
   environment:
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
     DEBIAN_FRONTEND: "noninteractive"
@@ -60,18 +71,13 @@
 # ========================================
 
 - name: Configure system limits
-  shell: "{{ runner_images_build_src }}/configure-limits.sh"
+  shell: "{{ installer_script_folder }}/configure-limits.sh"
 
 # ========================================
 # Provisioner 6: Copy build scripts
 # (file: build -> installer_script_folder)
+# MOVED ABOVE - keeping comment for reference
 # ========================================
-
-- name: Copy build scripts to installer folder
-  copy:
-    src: "{{ runner_images_build_src }}"
-    dest: "{{ installer_script_folder }}/"
-    mode: '0755'
 
 # ========================================
 # Provisioner 7: Copy assets (multiple sources)
