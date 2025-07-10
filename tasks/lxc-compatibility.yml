@@ -16,7 +16,31 @@
     path: /etc/cloud/templates
     state: directory
     mode: '0755'
-    
+
+- name: Create fake /sys/hypervisor directory (VM simulation)
+  file:
+    path: /sys/hypervisor
+    state: directory
+    mode: '0755'
+
+- name: Create fake /sys/class/dmi/id directory (DMI simulation)
+  file:
+    path: /sys/class/dmi/id
+    state: directory
+    mode: '0755'
+
+- name: Create fake DMI product name (simulate Azure VM)
+  copy:
+    content: "Virtual Machine"
+    dest: /sys/class/dmi/id/product_name
+    mode: '0644'
+
+- name: Create fake DMI system vendor (simulate Microsoft Azure)
+  copy:
+    content: "Microsoft Corporation"
+    dest: /sys/class/dmi/id/sys_vendor
+    mode: '0644'
+
 - name: Create fake waagent.conf
   copy:
     content: |
@@ -34,7 +58,6 @@
       ResourceDisk.Format=n
       ResourceDisk.Filesystem=ext4
       ResourceDisk.MountPoint=/mnt/resource
-      ResourceDisk.MountOptions=None
       ResourceDisk.EnableSwap=n
       ResourceDisk.SwapSizeMB=0
       Logs.Verbose=n
@@ -55,6 +78,62 @@
     dest: /etc/default/motd-news
     mode: '0644'
 
+- name: Create fake azure agent directory
+  file:
+    path: /var/lib/waagent
+    state: directory
+    mode: '0755'
+
+- name: Create fake azure agent state file
+  copy:
+    content: |
+      # Fake Azure agent state for LXC compatibility
+      provisioned
+    dest: /var/lib/waagent/provisioned
+    mode: '0644'
+
+- name: Create fake systemd machine-id
+  shell: |
+    if [ ! -f /etc/machine-id ]; then
+      systemd-machine-id-setup
+    fi
+  ignore_errors: true
+
+- name: Create fake Azure metadata endpoint response
+  copy:
+    content: |
+      #!/bin/bash
+      # Fake Azure metadata service for LXC compatibility
+      # This script simulates responses that Azure-specific tools might expect
+      
+      case "$1" in
+        "instance")
+          echo '{"compute":{"vmId":"fake-vm-id","location":"eastus","vmSize":"Standard_D2s_v3"}}'
+          ;;
+        "network")
+          echo '{"interface":[{"ipv4":{"ipAddress":[{"privateIpAddress":"10.0.0.4"}]}}]}'
+          ;;
+        *)
+          echo '{"error":"not found"}'
+          ;;
+      esac
+    dest: /usr/local/bin/fake-azure-metadata
+    mode: '0755'
+
+- name: Create fake hypervisor type file
+  copy:
+    content: "microsoft"
+    dest: /sys/hypervisor/type
+    mode: '0644'
+
 - name: Display fake files creation summary
   debug:
-    msg: "Created fake files for LXC compatibility: waagent.conf, motd-news, cloud-init templates" 
+    msg: |
+      Created fake files for LXC compatibility:
+      - waagent.conf and Azure agent state
+      - motd-news config
+      - cloud-init templates directory
+      - DMI system information (simulating Azure VM)
+      - hypervisor type simulation
+      - fake Azure metadata endpoint
+      This helps Azure-specific scripts run properly in LXC containers. 

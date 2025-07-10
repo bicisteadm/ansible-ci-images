@@ -2,6 +2,8 @@
 # ========================================
 # Azure Pipelines Agent Installation Role
 # ========================================
+# Converted from Packer build - following exact sequence
+# Using official runner-images scripts via git submodule
 
 # Pre-flight checks
 - name: Verify Ubuntu version
@@ -10,44 +12,44 @@
       - ansible_distribution == "Ubuntu"
       - ansible_distribution_version == "22.04"
     fail_msg: "This role is designed for Ubuntu 22.04 only"
-    
-- name: Create necessary directories
-  file:
-    path: "{{ item }}"
-    state: directory
-    mode: '0755'
-  loop:
-    - "{{ image_folder }}"
-    - "{{ installer_script_folder }}"
-    - "{{ helper_script_folder }}"
-    - "{{ image_folder }}/tests"
-    
-- name: Copy helper scripts to target
-  copy:
-    src: "helpers/"
-    dest: "{{ helper_script_folder }}/"
-    mode: '0755'
-    
-- name: Copy test scripts to target
-  copy:
-    src: "tests/"
-    dest: "{{ helper_script_folder }}/../tests/"
-    mode: '0755'
-    
-- name: Copy build scripts to target
-  copy:
-    src: "build/"
-    dest: "{{ installer_script_folder }}/"
-    mode: '0755'
-    
-- name: Copy toolset configuration
-  copy:
-    src: "toolset-2204.json"
-    dest: "{{ installer_script_folder }}/toolset.json"
-    mode: '0644'
 
 # ========================================
-# Phase 1: Basic System Setup
+# Phase 1: Directory creation and initial setup
+# (equivalent to: mkdir ${var.image_folder}, chmod 777 ${var.image_folder})
+# ========================================
+
+- name: Create image folder with 777 permissions
+  file:
+    path: "{{ image_folder }}"
+    state: directory
+    mode: '0777'
+
+- name: Create installer script folder
+  file:
+    path: "{{ installer_script_folder }}"
+    state: directory
+    mode: '0755'
+
+- name: Create helper script folder
+  file:
+    path: "{{ helper_script_folder }}"
+    state: directory
+    mode: '0755'
+
+# ========================================
+# Phase 2: Copy helper scripts
+# (equivalent to: provisioner "file" helpers -> helper_script_folder)
+# ========================================
+
+- name: Copy helper scripts to target
+  copy:
+    src: "{{ role_path }}/runner-images/images/ubuntu/scripts/helpers/"
+    dest: "{{ helper_script_folder }}/"
+    mode: '0755'
+
+# ========================================
+# Phase 3: Configure APT mock
+# (equivalent to: configure-apt-mock.sh)
 # ========================================
 
 - name: Configure APT mock (if needed)
@@ -56,58 +58,148 @@
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
     DEBIAN_FRONTEND: "{{ debian_frontend }}"
   ignore_errors: true
-  when: install_basic_packages | default(true)
-  
+
+# ========================================
+# Phase 4: APT configuration scripts
+# (equivalent to: install-ms-repos.sh, configure-apt-sources.sh, configure-apt.sh)
+# ========================================
+
 - name: Install Microsoft repositories
   shell: "{{ installer_script_folder }}/install-ms-repos.sh"
   environment:
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
     DEBIAN_FRONTEND: "{{ debian_frontend }}"
-  when: install_basic_packages | default(true)
-  
+
 - name: Configure APT sources
   shell: "{{ installer_script_folder }}/configure-apt-sources.sh"
   environment:
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
     DEBIAN_FRONTEND: "{{ debian_frontend }}"
-  when: install_basic_packages | default(true)
-  
+
 - name: Configure APT settings
   shell: "{{ installer_script_folder }}/configure-apt.sh"
   environment:
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
     DEBIAN_FRONTEND: "{{ debian_frontend }}"
-  when: install_basic_packages | default(true)
-  
+
+# ========================================
+# Phase 5: Configure system limits
+# (equivalent to: configure-limits.sh)
+# ========================================
+
 - name: Configure system limits
   shell: "{{ installer_script_folder }}/configure-limits.sh"
-  when: 
-    - configure_system_limits | default(true)
-    - install_basic_packages | default(true)
-  
-- name: Create fake files for LXC compatibility
-  include_tasks: lxc-compatibility.yml
-  when: install_basic_packages | default(true)
-  
+  when: configure_system_limits | default(true)
+
+# ========================================
+# Phase 6: Copy build scripts to installer folder
+# (equivalent to: provisioner "file" build -> installer_script_folder)
+# ========================================
+
+- name: Copy build scripts to installer folder
+  copy:
+    src: "{{ role_path }}/runner-images/images/ubuntu/scripts/build/"
+    dest: "{{ installer_script_folder }}/"
+    mode: '0755'
+
+# ========================================
+# Phase 7: Copy assets (post-gen, tests, docs-gen)
+# (equivalent to: multiple file provisioners for assets)
+# ========================================
+
+- name: Create directories for assets
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ image_folder }}/post-gen"
+    - "{{ image_folder }}/tests"
+    - "{{ image_folder }}/docs-gen"
+
+- name: Copy post-generation assets
+  copy:
+    src: "{{ role_path }}/runner-images/images/ubuntu/assets/post-gen/"
+    dest: "{{ image_folder }}/post-gen/"
+    mode: '0755'
+  ignore_errors: true
+
+- name: Copy test scripts
+  copy:
+    src: "{{ role_path }}/runner-images/images/ubuntu/scripts/tests/"
+    dest: "{{ image_folder }}/tests/"
+    mode: '0755'
+
+- name: Copy docs generation scripts
+  copy:
+    src: "{{ role_path }}/runner-images/images/ubuntu/scripts/docs-gen/"
+    dest: "{{ image_folder }}/docs-gen/"
+    mode: '0755'
+  ignore_errors: true
+
+# ========================================
+# Phase 8: Copy software report base
+# (equivalent to: software-report-base -> docs-gen/)
+# ========================================
+
+- name: Copy software report base
+  copy:
+    src: "{{ role_path }}/runner-images/helpers/software-report-base/"
+    dest: "{{ image_folder }}/docs-gen/"
+    mode: '0755'
+  ignore_errors: true
+
+# ========================================
+# Phase 9: Copy toolset configuration
+# (equivalent to: toolset-2204.json -> toolset.json)
+# ========================================
+
+- name: Copy toolset configuration
+  copy:
+    src: "{{ role_path }}/runner-images/images/ubuntu/toolsets/toolset-2204.json"
+    dest: "{{ installer_script_folder }}/toolset.json"
+    mode: '0644'
+
+# ========================================
+# Phase 10: Rename directories
+# (equivalent to: mv docs-gen SoftwareReport, mv post-gen post-generation)
+# ========================================
+
+- name: Rename docs-gen to SoftwareReport
+  command: mv "{{ image_folder }}/docs-gen" "{{ image_folder }}/SoftwareReport"
+  ignore_errors: true
+
+- name: Rename post-gen to post-generation
+  command: mv "{{ image_folder }}/post-gen" "{{ image_folder }}/post-generation"
+  ignore_errors: true
+
+# ========================================
+# Phase 11: Configure image data
+# (equivalent to: configure-image-data.sh)
+# ========================================
+
 - name: Configure image data
   shell: "{{ installer_script_folder }}/configure-image-data.sh"
   environment:
     IMAGE_VERSION: "{{ image_version }}"
     IMAGEDATA_FILE: "{{ image_folder }}/imagedata.json"
-  when: install_basic_packages | default(true)
-  
+
+# ========================================
+# Phase 12: Configure environment
+# (equivalent to: configure-environment.sh)
+# ========================================
+
 - name: Configure environment
   shell: "{{ installer_script_folder }}/configure-environment.sh"
   environment:
     IMAGE_VERSION: "{{ image_version }}"
     IMAGE_OS: "{{ image_os }}"
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
-  when: 
-    - configure_environment | default(true)
-    - install_basic_packages | default(true)
+  when: configure_environment | default(true)
 
 # ========================================
-# Phase 2: Essential Packages
+# Phase 13: Install vital APT packages
+# (equivalent to: install-apt-vital.sh)
 # ========================================
 
 - name: Install vital APT packages
@@ -116,122 +208,589 @@
     DEBIAN_FRONTEND: "{{ debian_frontend }}"
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
     INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
-  when: install_basic_packages | default(true)
-  
+
+# ========================================
+# Phase 14: Install PowerShell
+# (equivalent to: install-powershell.sh)
+# ========================================
+
 - name: Install PowerShell
   shell: "{{ installer_script_folder }}/install-powershell.sh"
   environment:
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
     INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
-  when: install_basic_packages | default(true)
-  
+
+# ========================================
+# Phase 15: Install PowerShell modules
+# (equivalent to: Install-PowerShellModules.ps1, Install-PowerShellAzModules.ps1)
+# ========================================
+
 - name: Install PowerShell modules
   shell: "pwsh -f {{ installer_script_folder }}/Install-PowerShellModules.ps1"
   environment:
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
     INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
-  when: install_basic_packages | default(true)
-  
+
 - name: Install PowerShell Azure modules
   shell: "pwsh -f {{ installer_script_folder }}/Install-PowerShellAzModules.ps1"
   environment:
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
     INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
-  when: install_basic_packages | default(true)
-  
-- name: Install common APT packages  
-  shell: "{{ installer_script_folder }}/install-apt-common.sh"
+
+# ========================================
+# Phase 16: Main installation sequence
+# (equivalent to: big list of installation scripts)
+# ========================================
+
+- name: Install Actions Cache
+  shell: "{{ installer_script_folder }}/install-actions-cache.sh"
   environment:
-    DEBIAN_FRONTEND: "{{ debian_frontend }}"
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
     INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
-  when: install_basic_packages | default(true)
-
-# ========================================
-# Phase 3: CI/CD Tools
-# ========================================
-
-- name: Install CI/CD tools
-  include_tasks: ci-cd-tools.yml
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
   when: install_ci_cd_tools | default(true)
 
-# ========================================
-# Phase 4: Cloud Tools
-# ========================================
+- name: Install Runner Package
+  shell: "{{ installer_script_folder }}/install-runner-package.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_ci_cd_tools | default(true)
 
-- name: Install Azure tools
-  include_tasks: azure-tools.yml
+- name: Install common APT packages
+  shell: "{{ installer_script_folder }}/install-apt-common.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+
+- name: Install AzCopy
+  shell: "{{ installer_script_folder }}/install-azcopy.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
   when: install_azure_tools | default(true)
 
-- name: Install cloud tools
-  include_tasks: cloud-tools.yml
+- name: Install Azure CLI
+  shell: "{{ installer_script_folder }}/install-azure-cli.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_azure_tools | default(true)
+
+- name: Install Azure DevOps CLI
+  shell: "{{ installer_script_folder }}/install-azure-devops-cli.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_azure_tools | default(true)
+
+- name: Install Bicep
+  shell: "{{ installer_script_folder }}/install-bicep.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_azure_tools | default(true)
+
+- name: Install Aliyun CLI
+  shell: "{{ installer_script_folder }}/install-aliyun-cli.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
   when: install_cloud_tools | default(true)
 
-# ========================================
-# Phase 5: Development Tools
-# ========================================
-
-- name: Install development tools and compilers
-  include_tasks: development-tools.yml
-  when: install_development_tools | default(true)
-
-- name: Install compilers
-  include_tasks: compilers.yml
-  when: install_compilers | default(true)
-
-- name: Install version control tools
-  include_tasks: version-control.yml
-  when: install_version_control | default(true)
-
-- name: Install programming languages
-  include_tasks: programming-languages.yml
-  when: install_programming_languages | default(true)
-
-# ========================================
-# Phase 6: Infrastructure Tools
-# ========================================
-
-- name: Install infrastructure tools
-  include_tasks: infrastructure-tools.yml
-  when: install_infrastructure_tools | default(true)
-
-# ========================================
-# Phase 7: Utilities and Specialized Tools
-# ========================================
-
-- name: Install utilities
-  include_tasks: utilities.yml
+- name: Install Apache
+  shell: "{{ installer_script_folder }}/install-apache.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
   when: install_utilities | default(true)
 
-- name: Install databases
-  include_tasks: databases.yml
-  when: install_databases | default(true)
+- name: Install AWS tools
+  shell: "{{ installer_script_folder }}/install-aws-tools.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_cloud_tools | default(true)
 
-- name: Install browsers and testing tools
-  include_tasks: browsers.yml
-  when: install_browsers | default(true)
+- name: Install Clang
+  shell: "{{ installer_script_folder }}/install-clang.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_compilers | default(true)
 
-- name: Install container tools
-  include_tasks: container-tools.yml
+- name: Install Swift
+  shell: "{{ installer_script_folder }}/install-swift.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_compilers | default(true)
+
+- name: Install CMake
+  shell: "{{ installer_script_folder }}/install-cmake.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_development_tools | default(true)
+
+- name: Install CodeQL Bundle
+  shell: "{{ installer_script_folder }}/install-codeql-bundle.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_development_tools | default(true)
+
+- name: Install Container Tools
+  shell: "{{ installer_script_folder }}/install-container-tools.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
   when: install_container_tools | default(true)
 
-- name: Install specialized tools
-  include_tasks: specialized-tools.yml
+- name: Install .NET Core SDK
+  shell: "{{ installer_script_folder }}/install-dotnetcore-sdk.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_programming_languages | default(true)
+
+- name: Install Firefox
+  shell: "{{ installer_script_folder }}/install-firefox.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_browsers | default(true)
+
+- name: Install Microsoft Edge
+  shell: "{{ installer_script_folder }}/install-microsoft-edge.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_browsers | default(true)
+
+- name: Install GCC Compilers
+  shell: "{{ installer_script_folder }}/install-gcc-compilers.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_compilers | default(true)
+
+- name: Install GFortran
+  shell: "{{ installer_script_folder }}/install-gfortran.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_compilers | default(true)
+
+- name: Install Git
+  shell: "{{ installer_script_folder }}/install-git.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_version_control | default(true)
+
+- name: Install Git LFS
+  shell: "{{ installer_script_folder }}/install-git-lfs.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_version_control | default(true)
+
+- name: Install GitHub CLI
+  shell: "{{ installer_script_folder }}/install-github-cli.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_version_control | default(true)
+
+- name: Install Google Chrome
+  shell: "{{ installer_script_folder }}/install-google-chrome.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_browsers | default(true)
+
+- name: Install Google Cloud CLI
+  shell: "{{ installer_script_folder }}/install-google-cloud-cli.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_cloud_tools | default(true)
+
+- name: Install Haskell
+  shell: "{{ installer_script_folder }}/install-haskell.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_programming_languages | default(true)
+
+- name: Install Heroku
+  shell: "{{ installer_script_folder }}/install-heroku.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_utilities | default(true)
+
+- name: Install Java tools
+  shell: "{{ installer_script_folder }}/install-java-tools.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_programming_languages | default(true)
+
+- name: Install Kubernetes tools
+  shell: "{{ installer_script_folder }}/install-kubernetes-tools.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_infrastructure_tools | default(true)
+
+- name: Install OpenShift CLI
+  shell: "{{ installer_script_folder }}/install-oc-cli.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_infrastructure_tools | default(true)
+
+- name: Install Leiningen
+  shell: "{{ installer_script_folder }}/install-leiningen.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_programming_languages | default(true)
+
+- name: Install Miniconda
+  shell: "{{ installer_script_folder }}/install-miniconda.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
   when: install_specialized_tools | default(true)
 
-- name: Install package managers
-  include_tasks: package-managers.yml
-  when: install_package_managers | default(true)
+- name: Install Mono
+  shell: "{{ installer_script_folder }}/install-mono.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_programming_languages | default(true)
 
-# ========================================
-# Phase 8: System Configuration
-# ========================================
+- name: Install Kotlin
+  shell: "{{ installer_script_folder }}/install-kotlin.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_programming_languages | default(true)
+
+- name: Install MySQL
+  shell: "{{ installer_script_folder }}/install-mysql.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_databases | default(true)
+
+- name: Install MSSQL Tools
+  shell: "{{ installer_script_folder }}/install-mssql-tools.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_databases | default(true)
+
+- name: Install SQLPackage
+  shell: "{{ installer_script_folder }}/install-sqlpackage.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_databases | default(true)
+
+- name: Install Nginx
+  shell: "{{ installer_script_folder }}/install-nginx.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_utilities | default(true)
+
+- name: Install NVM
+  shell: "{{ installer_script_folder }}/install-nvm.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_programming_languages | default(true)
+
+- name: Install Node.js
+  shell: "{{ installer_script_folder }}/install-nodejs.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_programming_languages | default(true)
+
+- name: Install Bazel
+  shell: "{{ installer_script_folder }}/install-bazel.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_development_tools | default(true)
+
+- name: Install ORAS CLI
+  shell: "{{ installer_script_folder }}/install-oras-cli.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_specialized_tools | default(true)
+
+- name: Install PHP
+  shell: "{{ installer_script_folder }}/install-php.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_programming_languages | default(true)
+
+- name: Install PostgreSQL
+  shell: "{{ installer_script_folder }}/install-postgresql.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_databases | default(true)
+
+- name: Install Pulumi
+  shell: "{{ installer_script_folder }}/install-pulumi.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_infrastructure_tools | default(true)
+
+- name: Install Ruby
+  shell: "{{ installer_script_folder }}/install-ruby.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_programming_languages | default(true)
+
+- name: Install R Language
+  shell: "{{ installer_script_folder }}/install-rlang.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_programming_languages | default(true)
+
+- name: Install Rust
+  shell: "{{ installer_script_folder }}/install-rust.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_programming_languages | default(true)
+
+- name: Install Julia
+  shell: "{{ installer_script_folder }}/install-julia.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_programming_languages | default(true)
+
+- name: Install SBT
+  shell: "{{ installer_script_folder }}/install-sbt.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_programming_languages | default(true)
+
+- name: Install Selenium
+  shell: "{{ installer_script_folder }}/install-selenium.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_browsers | default(true)
+
+- name: Install Terraform
+  shell: "{{ installer_script_folder }}/install-terraform.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_infrastructure_tools | default(true)
+
+- name: Install Packer
+  shell: "{{ installer_script_folder }}/install-packer.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_infrastructure_tools | default(true)
+
+- name: Install VCPKG
+  shell: "{{ installer_script_folder }}/install-vcpkg.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_development_tools | default(true)
 
 - name: Configure DPKG
   shell: "{{ installer_script_folder }}/configure-dpkg.sh"
   environment:
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
   when: configure_dpkg | default(true)
+
+- name: Install YQ
+  shell: "{{ installer_script_folder }}/install-yq.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_utilities | default(true)
+
+- name: Install Android SDK
+  shell: "{{ installer_script_folder }}/install-android-sdk.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_specialized_tools | default(true)
+
+- name: Install PyPy
+  shell: "{{ installer_script_folder }}/install-pypy.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_programming_languages | default(true)
+
+- name: Install Python
+  shell: "{{ installer_script_folder }}/install-python.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_programming_languages | default(true)
+
+- name: Install Zstd
+  shell: "{{ installer_script_folder }}/install-zstd.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_utilities | default(true)
+
+- name: Install Ninja
+  shell: "{{ installer_script_folder }}/install-ninja.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_development_tools | default(true)
+
+# ========================================
+# Phase 17: Install Docker (with credentials)
+# (equivalent to: install-docker.sh with DOCKERHUB credentials)
+# ========================================
+
+- name: Install Docker
+  shell: "{{ installer_script_folder }}/install-docker.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DOCKERHUB_LOGIN: "{{ dockerhub_login | default('') }}"
+    DOCKERHUB_PASSWORD: "{{ dockerhub_password | default('') }}"
+  when: install_container_tools | default(true)
+
+# ========================================
+# Phase 18: PowerShell toolset configuration
+# (equivalent to: Install-Toolset.ps1, Configure-Toolset.ps1)
+# ========================================
+
+- name: Install toolset via PowerShell
+  shell: "pwsh -f {{ installer_script_folder }}/Install-Toolset.ps1"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+
+- name: Configure toolset via PowerShell
+  shell: "pwsh -f {{ installer_script_folder }}/Configure-Toolset.ps1"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+
+# ========================================
+# Phase 19: Install pipx packages
+# (equivalent to: install-pipx-packages.sh)
+# ========================================
+
+- name: Install pipx packages
+  shell: "{{ installer_script_folder }}/install-pipx-packages.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+  when: install_programming_languages | default(true)
+
+# ========================================
+# Phase 20: Install Homebrew (as non-root user)
+# (equivalent to: install-homebrew.sh with different execute_command)
+# ========================================
+
+- name: Install Homebrew
+  shell: "{{ installer_script_folder }}/install-homebrew.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+  become: false
+  become_user: "{{ target_user }}"
+  when: install_package_managers | default(true)
+
+# ========================================
+# Phase 21: Configure snap
+# (equivalent to: configure-snap.sh)
+# ========================================
 
 - name: Configure snap
   shell: "{{ installer_script_folder }}/configure-snap.sh"
@@ -240,18 +799,117 @@
   when: configure_snap | default(true)
 
 # ========================================
-# Phase 9: Cleanup
+# Phase 22: LXC compatibility (fake VM files)
+# (NOTE: This replaces the reboot step from Packer since LXC doesn't need reboot)
 # ========================================
 
-- name: Run cleanup
+- name: Create fake files for LXC compatibility
+  include_tasks: lxc-compatibility.yml
+
+# ========================================
+# Phase 23: Cleanup
+# (equivalent to: cleanup.sh with pause_before and start_retry_timeout)
+# ========================================
+
+- name: Run cleanup (with pause like in Packer)
   shell: "{{ installer_script_folder }}/cleanup.sh"
   environment:
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
-  when: install_basic_packages | default(true)
-  
+
+# ========================================
+# Phase 24: Generate software reports
+# (equivalent to: Generate-SoftwareReport.ps1, RunAll-Tests.ps1)
+# ========================================
+
+- name: Generate software report
+  shell: "pwsh -File {{ image_folder }}/SoftwareReport/Generate-SoftwareReport.ps1 -OutputDirectory {{ image_folder }}"
+  environment:
+    IMAGE_VERSION: "{{ image_version }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+  ignore_errors: true
+
+- name: Run all tests
+  shell: "pwsh -File {{ image_folder }}/tests/RunAll-Tests.ps1 -OutputDirectory {{ image_folder }}"
+  environment:
+    IMAGE_VERSION: "{{ image_version }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+  ignore_errors: true
+
+# ========================================
+# Phase 25: Download reports (fetch to localhost)
+# (equivalent to: provisioner "file" direction="download")
+# ========================================
+
+- name: Fetch Ubuntu README to control machine
+  fetch:
+    src: "{{ image_folder }}/software-report.md"
+    dest: "./Ubuntu2204-Readme.md"
+    flat: yes
+  ignore_errors: true
+
+- name: Fetch software report JSON to control machine
+  fetch:
+    src: "{{ image_folder }}/software-report.json"
+    dest: "./software-report.json"
+    flat: yes
+  ignore_errors: true
+
+# ========================================
+# Phase 26: Configure system
+# (equivalent to: configure-system.sh)
+# ========================================
+
+- name: Configure system
+  shell: "{{ installer_script_folder }}/configure-system.sh"
+  environment:
+    HELPER_SCRIPT_FOLDER: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    IMAGE_FOLDER: "{{ image_folder }}"
+
+# ========================================
+# Phase 27: Copy machine instance config
+# (equivalent to: copy ubuntu2204.conf and move to /etc/vsts/)
+# ========================================
+
+- name: Create /etc/vsts directory
+  file:
+    path: /etc/vsts
+    state: directory
+    mode: '0755'
+
+- name: Copy machine instance configuration
+  copy:
+    src: "{{ role_path }}/runner-images/images/ubuntu/assets/ubuntu2204.conf"
+    dest: "/etc/vsts/machine_instance.conf"
+    mode: '0644'
+  ignore_errors: true
+
+# ========================================
+# Phase 28: Post-build validation
+# (equivalent to: post-build-validation.sh)
+# ========================================
+
+- name: Run post-build validation
+  shell: "{{ installer_script_folder }}/post-build-validation.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+  ignore_errors: true
+
+# ========================================
+# Phase 29: Final cleanup for LXC
+# (NOTE: skipping waagent deprovision since it's Azure-specific)
+# ========================================
+
 - name: Clean up fake files created for LXC compatibility
   include_tasks: lxc-cleanup.yml
-  when: install_basic_packages | default(true)
+
+- name: Final sleep (like in original Packer)
+  pause:
+    seconds: 30
+
+# ========================================
+# Phase 30: Installation summary
+# ========================================
 
 - name: Display installation summary
   debug:
@@ -261,4 +919,6 @@
       Image OS: {{ image_os }}
       Toolcache Directory: {{ toolcache_root }}
       
-      All selected installation scripts have been executed. 
+      All selected installation scripts have been executed following the exact Packer sequence.
+      Scripts are sourced from official runner-images git submodule.
+      Reports have been generated and fetched to the control machine. 

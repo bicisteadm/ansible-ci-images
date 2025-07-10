@@ -4,6 +4,8 @@
 
 This Ansible role is based on the official [GitHub Actions runner-images](https://github.com/actions/runner-images) repository and installs the same comprehensive set of development tools on Ubuntu 22.04 LXC containers. Instead of building VM images, this role configures existing containers with the identical software stack used by GitHub-hosted runners.
 
+**✨ New: Uses official scripts via git submodule - always up-to-date with upstream!**
+
 ## Overview
 
 The role automatically installs:
@@ -22,19 +24,56 @@ The role automatically installs:
 - Ansible 2.9+
 - Root access or sudo privileges
 - Internet connection
+- Git (for submodule initialization)
 
 ## Role Installation
 
-### From GitHub
+### From GitHub (with submodules)
 
 ```bash
-ansible-galaxy install git+https://github.com/bicisteadm/ansible-role-ci-images.git
+# Clone with submodules
+git clone --recursive https://github.com/bicisteadm/ansible-role-ci-images.git
+
+# Or if already cloned, initialize submodules
+git submodule update --init --recursive
 ```
 
 ### From Ansible Galaxy (if published)
 
 ```bash
 ansible-galaxy install your-username.azure-pipelines-agent
+
+# Then initialize submodules
+cd ~/.ansible/roles/your-username.azure-pipelines-agent
+git submodule update --init --recursive
+```
+
+## ⚠️ Important: Git Submodule
+
+This role uses a git submodule to source scripts directly from the official [GitHub Actions runner-images](https://github.com/actions/runner-images) repository. This ensures you always have the latest, official installation scripts.
+
+### First-time setup:
+
+```bash
+# In the role directory
+git submodule update --init --recursive
+```
+
+### Updating to latest scripts:
+
+```bash
+# Update to latest runner-images scripts
+git submodule update --remote runner-images
+
+# Commit the update
+git add runner-images
+git commit -m "Update runner-images submodule to latest"
+```
+
+### Checking submodule status:
+
+```bash
+git submodule status
 ```
 
 ## Usage
@@ -248,4 +287,87 @@ ansible-playbook -i inventory playbook.yml --tags "programming-languages,databas
 
 # Skip browsers
 ansible-playbook -i inventory playbook.yml --skip-tags "browsers"
-``` 
+```
+
+## 🔄 Architecture: Packer to Ansible Conversion
+
+This role follows the **exact sequence** from the original Packer build, ensuring 100% compatibility:
+
+| Packer Phase | Ansible Equivalent | Purpose |
+|-------------|-------------------|---------|
+| Directory creation | Phase 1: Create directories | Setup workspace |
+| File provisioners | Phase 2-9: Copy scripts from submodule | Copy official scripts |
+| Shell provisioners | Phase 10-28: Install everything | Run official installers |
+| Reboot | Phase 22: LXC compatibility | Fake VM environment |
+| Cleanup & validation | Phase 23-30: Cleanup & reports | Final steps |
+
+### 🐳 LXC Container Compatibility
+
+Since LXC containers don't have VM-specific features, this role includes sophisticated "VM faking":
+
+- **DMI information** - Simulates Azure VM hardware info
+- **Hypervisor detection** - Creates `/sys/hypervisor/type`
+- **Azure agent state** - Fake waagent and Azure metadata
+- **Machine ID** - Proper systemd machine identification
+
+This ensures all Azure-specific scripts run without modification.
+
+## 📁 Project Structure
+
+```
+.
+├── runner-images/              # Git submodule (official scripts)
+│   └── images/ubuntu/
+│       ├── scripts/
+│       │   ├── build/         # Installation scripts
+│       │   ├── helpers/       # Helper functions
+│       │   ├── tests/         # Test scripts
+│       │   └── docs-gen/      # Documentation scripts
+│       ├── assets/
+│       │   ├── post-gen/      # Post-generation scripts
+│       │   └── ubuntu2204.conf
+│       └── toolsets/
+│           └── toolset-2204.json
+├── tasks/
+│   ├── main.yml              # Main installation sequence
+│   ├── lxc-compatibility.yml # LXC VM faking
+│   └── lxc-cleanup.yml       # Cleanup fake files
+└── defaults/main.yml         # Default variables
+```
+
+## 🚀 Benefits of This Approach
+
+1. **Always Current** - Scripts are always the latest from GitHub
+2. **Official Support** - Uses unmodified official installation scripts
+3. **LXC Optimized** - Works perfectly in containers
+4. **Fully Compatible** - Same results as GitHub-hosted runners
+5. **Maintainable** - Auto-updates when upstream changes
+
+## 🛠️ Maintenance
+
+### Update to Latest Runner Images
+
+```bash
+# Update submodule to latest
+git submodule update --remote runner-images
+
+# Test the updated scripts
+ansible-playbook test-playbook.yml
+
+# Commit if everything works
+git add runner-images
+git commit -m "Update to latest runner-images"
+```
+
+### Troubleshooting
+
+If installation fails:
+
+1. **Check submodule**: `git submodule status`
+2. **Update submodule**: `git submodule update --init --recursive`
+3. **Verify scripts exist**: `ls runner-images/images/ubuntu/scripts/build/`
+4. **Check LXC compatibility**: Review `/var/log/ansible.log`
+
+## 📄 License
+
+Same as original runner-images: MIT License 

@@ -1,26 +1,53 @@
 ---
 # ========================================
-# LXC Compatibility - Cleanup fake files
+# LXC Cleanup - Remove fake files
 # ========================================
-# Remove all fake files that were created for LXC compatibility
+# Clean up all fake files created for LXC compatibility
 
-- name: Remove fake files
+- name: Remove fake waagent.conf
   file:
-    path: "{{ item }}"
+    path: /etc/waagent.conf
     state: absent
-  loop:
-    - /etc/waagent.conf
-    - /etc/default/motd-news
-    
-- name: Remove fake directories (if empty)
-  file:
-    path: "{{ item }}"
-    state: absent
-  loop:
-    - /etc/cloud/templates
-    - /etc/cloud
   ignore_errors: true
-  
+
+- name: Remove fake motd-news config
+  file:
+    path: /etc/default/motd-news
+    state: absent
+  ignore_errors: true
+
+- name: Remove fake cloud-init templates directory
+  file:
+    path: /etc/cloud/templates
+    state: absent
+  ignore_errors: true
+
+- name: Remove fake DMI system information
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /sys/class/dmi/id/product_name
+    - /sys/class/dmi/id/sys_vendor
+    - /sys/class/dmi/id
+    - /sys/hypervisor/type
+    - /sys/hypervisor
+  ignore_errors: true
+
+- name: Remove fake Azure agent files
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /var/lib/waagent/provisioned
+    - /usr/local/bin/fake-azure-metadata
+  ignore_errors: true
+
 - name: Display cleanup summary
   debug:
-    msg: "Cleaned up fake files created for LXC compatibility" 
+    msg: |
+      LXC cleanup completed:
+      - Removed all fake Azure-specific files
+      - Removed simulated VM/hypervisor information
+      - Removed fake metadata endpoints
+      - Container is now clean of LXC compatibility artifacts 
