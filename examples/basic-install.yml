@@ -1,0 +1,32 @@
+---
+# Základní playbook pro instalaci Azure Pipelines Agent
+# Tento playbook použije roli s výchozím nastavením
+
+- name: Nastavení Azure Pipelines Agent s výchozím nastavením
+  hosts: ubuntu_containers
+  become: yes
+  become_method: sudo
+  gather_facts: yes
+  
+  vars:
+    # Základní nastavení - tyto proměnné musí být zde pro přístup v post_tasks
+    image_version: "20250629.1.0"
+    image_os: "ubuntu22"
+    image_folder: "/imagegeneration"
+  
+  # Použití lokální role z kořenového adresáře
+  roles:
+    - role: /Users/adam/Documents/Projects/ansible-ci-images
+      vars:
+        # Předání proměnných do role
+        image_version: "{{ image_version }}"
+        image_os: "{{ image_os }}"
+        
+  post_tasks:
+    - name: Zobrazit informace o dokončené instalaci
+      debug:
+        msg: 
+          - "Azure Pipelines Agent byl úspěšně nainstalován!"
+          - "Verze obrazu: {{ image_version }}"
+          - "OS: {{ image_os }}"
+          - "Instalační složka: {{ image_folder }}" 

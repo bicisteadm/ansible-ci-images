@@ -1,6 +1,8 @@
 # Azure Pipelines Agent Ansible Role
 
-This Ansible role installs Azure Pipelines Agent on Ubuntu 22.04 LXC containers with a complete set of development tools.
+**🔀 Fork of [GitHub Actions runner-images](https://github.com/actions/runner-images) converted to Ansible**
+
+This Ansible role is based on the official [GitHub Actions runner-images](https://github.com/actions/runner-images) repository and installs the same comprehensive set of development tools on Ubuntu 22.04 LXC containers. Instead of building VM images, this role configures existing containers with the identical software stack used by GitHub-hosted runners.
 
 ## Overview
 
@@ -26,7 +28,7 @@ The role automatically installs:
 ### From GitHub
 
 ```bash
-ansible-galaxy install git+https://github.com/your-username/azure-pipelines-agent.git
+ansible-galaxy install git+https://github.com/bicisteadm/ansible-role-ci-images.git
 ```
 
 ### From Ansible Galaxy (if published)

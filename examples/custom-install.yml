@@ -1,0 +1,78 @@
+---
+# Pokročilý playbook pro instalaci Azure Pipelines Agent
+# Tento playbook ukazuje jak přizpůsobit instalaci podle potřeb
+
+- name: Přizpůsobená instalace Azure Pipelines Agent
+  hosts: ubuntu_containers
+  become: yes
+  become_method: sudo
+  gather_facts: yes
+  
+  vars:
+    # Přizpůsobené nastavení pro specifické potřeby
+    custom_image_version: "20250629.2.0"
+    image_folder: "/imagegeneration"
+    target_user: "{{ ansible_user }}"
+    
+  roles:
+    - role: ../
+      vars:
+        # Základní konfigurace
+        image_version: "{{ custom_image_version }}"
+        image_os: "ubuntu22"
+        target_user: "{{ target_user }}"
+        
+        # Volitelné Docker Hub přihlašovací údaje
+        # dockerhub_login: "your_username"
+        # dockerhub_password: "your_password"
+        
+        # Selektivní instalace nástrojů - lze vypnout nepotřebné
+        install_basic_packages: true
+        install_ci_cd_tools: true
+        install_azure_tools: true
+        install_cloud_tools: true
+        install_development_tools: true
+        install_compilers: true
+        install_version_control: true
+        install_programming_languages: true
+        install_infrastructure_tools: false  # Vypnuto pro úsporu místa
+        install_utilities: true
+        install_databases: false  # Vypnuto - není potřeba
+        install_browsers: false   # Vypnuto pro headless prostředí
+        install_container_tools: true
+        install_specialized_tools: false  # Vypnuto pro rychlejší instalaci
+        install_package_managers: true
+        
+        # Systémová konfigurace
+        configure_system_limits: true
+        configure_environment: true
+        
+  post_tasks:
+    - name: Kontrola instalace PowerShell
+      command: pwsh --version
+      register: powershell_version
+      ignore_errors: yes
+      
+    - name: Zobrazit informace o PowerShell
+      debug:
+        msg: "PowerShell verze: {{ powershell_version.stdout | default('Není nainstalován') }}"
+      when: powershell_version is defined
+      
+    - name: Kontrola Azure CLI
+      command: az --version
+      register: az_version
+      ignore_errors: yes
+      
+    - name: Zobrazit informace o Azure CLI
+      debug:
+        msg: "Azure CLI je k dispozici"
+      when: az_version.rc == 0
+      
+    - name: Shrnutí instalace
+      debug:
+        msg:
+          - "=== Instalace dokončena ==="
+          - "Verze obrazu: {{ custom_image_version }}"
+          - "Cílový uživatel: {{ target_user }}"
+          - "Složka instalace: {{ image_folder }}"
+          - "===========================" 
