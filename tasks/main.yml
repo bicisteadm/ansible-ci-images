@@ -1,0 +1,264 @@
+---
+# ========================================
+# Azure Pipelines Agent Installation Role
+# ========================================
+
+# Pre-flight checks
+- name: Verify Ubuntu version
+  assert:
+    that:
+      - ansible_distribution == "Ubuntu"
+      - ansible_distribution_version == "22.04"
+    fail_msg: "This role is designed for Ubuntu 22.04 only"
+    
+- name: Create necessary directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ image_folder }}"
+    - "{{ installer_script_folder }}"
+    - "{{ helper_script_folder }}"
+    - "{{ image_folder }}/tests"
+    
+- name: Copy helper scripts to target
+  copy:
+    src: "helpers/"
+    dest: "{{ helper_script_folder }}/"
+    mode: '0755'
+    
+- name: Copy test scripts to target
+  copy:
+    src: "tests/"
+    dest: "{{ helper_script_folder }}/../tests/"
+    mode: '0755'
+    
+- name: Copy build scripts to target
+  copy:
+    src: "build/"
+    dest: "{{ installer_script_folder }}/"
+    mode: '0755'
+    
+- name: Copy toolset configuration
+  copy:
+    src: "toolset-2204.json"
+    dest: "{{ installer_script_folder }}/toolset.json"
+    mode: '0644'
+
+# ========================================
+# Phase 1: Basic System Setup
+# ========================================
+
+- name: Configure APT mock (if needed)
+  shell: "{{ installer_script_folder }}/configure-apt-mock.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  ignore_errors: true
+  when: install_basic_packages | default(true)
+  
+- name: Install Microsoft repositories
+  shell: "{{ installer_script_folder }}/install-ms-repos.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_basic_packages | default(true)
+  
+- name: Configure APT sources
+  shell: "{{ installer_script_folder }}/configure-apt-sources.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_basic_packages | default(true)
+  
+- name: Configure APT settings
+  shell: "{{ installer_script_folder }}/configure-apt.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+  when: install_basic_packages | default(true)
+  
+- name: Configure system limits
+  shell: "{{ installer_script_folder }}/configure-limits.sh"
+  when: 
+    - configure_system_limits | default(true)
+    - install_basic_packages | default(true)
+  
+- name: Create fake files for LXC compatibility
+  include_tasks: lxc-compatibility.yml
+  when: install_basic_packages | default(true)
+  
+- name: Configure image data
+  shell: "{{ installer_script_folder }}/configure-image-data.sh"
+  environment:
+    IMAGE_VERSION: "{{ image_version }}"
+    IMAGEDATA_FILE: "{{ image_folder }}/imagedata.json"
+  when: install_basic_packages | default(true)
+  
+- name: Configure environment
+  shell: "{{ installer_script_folder }}/configure-environment.sh"
+  environment:
+    IMAGE_VERSION: "{{ image_version }}"
+    IMAGE_OS: "{{ image_os }}"
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+  when: 
+    - configure_environment | default(true)
+    - install_basic_packages | default(true)
+
+# ========================================
+# Phase 2: Essential Packages
+# ========================================
+
+- name: Install vital APT packages
+  shell: "{{ installer_script_folder }}/install-apt-vital.sh"
+  environment:
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+  when: install_basic_packages | default(true)
+  
+- name: Install PowerShell
+  shell: "{{ installer_script_folder }}/install-powershell.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+  when: install_basic_packages | default(true)
+  
+- name: Install PowerShell modules
+  shell: "pwsh -f {{ installer_script_folder }}/Install-PowerShellModules.ps1"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+  when: install_basic_packages | default(true)
+  
+- name: Install PowerShell Azure modules
+  shell: "pwsh -f {{ installer_script_folder }}/Install-PowerShellAzModules.ps1"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+  when: install_basic_packages | default(true)
+  
+- name: Install common APT packages  
+  shell: "{{ installer_script_folder }}/install-apt-common.sh"
+  environment:
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+  when: install_basic_packages | default(true)
+
+# ========================================
+# Phase 3: CI/CD Tools
+# ========================================
+
+- name: Install CI/CD tools
+  include_tasks: ci-cd-tools.yml
+  when: install_ci_cd_tools | default(true)
+
+# ========================================
+# Phase 4: Cloud Tools
+# ========================================
+
+- name: Install Azure tools
+  include_tasks: azure-tools.yml
+  when: install_azure_tools | default(true)
+
+- name: Install cloud tools
+  include_tasks: cloud-tools.yml
+  when: install_cloud_tools | default(true)
+
+# ========================================
+# Phase 5: Development Tools
+# ========================================
+
+- name: Install development tools and compilers
+  include_tasks: development-tools.yml
+  when: install_development_tools | default(true)
+
+- name: Install compilers
+  include_tasks: compilers.yml
+  when: install_compilers | default(true)
+
+- name: Install version control tools
+  include_tasks: version-control.yml
+  when: install_version_control | default(true)
+
+- name: Install programming languages
+  include_tasks: programming-languages.yml
+  when: install_programming_languages | default(true)
+
+# ========================================
+# Phase 6: Infrastructure Tools
+# ========================================
+
+- name: Install infrastructure tools
+  include_tasks: infrastructure-tools.yml
+  when: install_infrastructure_tools | default(true)
+
+# ========================================
+# Phase 7: Utilities and Specialized Tools
+# ========================================
+
+- name: Install utilities
+  include_tasks: utilities.yml
+  when: install_utilities | default(true)
+
+- name: Install databases
+  include_tasks: databases.yml
+  when: install_databases | default(true)
+
+- name: Install browsers and testing tools
+  include_tasks: browsers.yml
+  when: install_browsers | default(true)
+
+- name: Install container tools
+  include_tasks: container-tools.yml
+  when: install_container_tools | default(true)
+
+- name: Install specialized tools
+  include_tasks: specialized-tools.yml
+  when: install_specialized_tools | default(true)
+
+- name: Install package managers
+  include_tasks: package-managers.yml
+  when: install_package_managers | default(true)
+
+# ========================================
+# Phase 8: System Configuration
+# ========================================
+
+- name: Configure DPKG
+  shell: "{{ installer_script_folder }}/configure-dpkg.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+  when: configure_dpkg | default(true)
+
+- name: Configure snap
+  shell: "{{ installer_script_folder }}/configure-snap.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+  when: configure_snap | default(true)
+
+# ========================================
+# Phase 9: Cleanup
+# ========================================
+
+- name: Run cleanup
+  shell: "{{ installer_script_folder }}/cleanup.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+  when: install_basic_packages | default(true)
+  
+- name: Clean up fake files created for LXC compatibility
+  include_tasks: lxc-cleanup.yml
+  when: install_basic_packages | default(true)
+
+- name: Display installation summary
+  debug:
+    msg: |
+      Azure Pipelines Agent installation completed successfully!
+      Image Version: {{ image_version }}
+      Image OS: {{ image_os }}
+      Toolcache Directory: {{ toolcache_root }}
+      
+      All selected installation scripts have been executed. 

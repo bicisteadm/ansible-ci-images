@@ -1,0 +1,43 @@
+---
+# Image information - default values
+image_version: "20250629.1.0"
+image_os: "ubuntu22"
+
+# Directory structure matching original Packer setup
+image_folder: "/imagegeneration"
+installer_script_folder: "/imagegeneration/installers"
+helper_script_folder: "/imagegeneration/helpers"
+toolcache_root: "/opt/hostedtoolcache"
+
+# Environment variables
+debian_frontend: "noninteractive"
+
+# Optional Docker Hub login credentials
+dockerhub_login: ""
+dockerhub_password: ""
+
+# Control what gets installed with these boolean flags
+install_basic_packages: true
+install_ci_cd_tools: true
+install_azure_tools: true
+install_cloud_tools: true
+install_development_tools: true
+install_compilers: true
+install_version_control: true
+install_programming_languages: true
+install_infrastructure_tools: true
+install_utilities: true
+install_databases: true
+install_browsers: true
+install_container_tools: true
+install_specialized_tools: true
+install_package_managers: true
+
+# Target user for installations that require non-root user
+target_user: "{{ ansible_user | default('root') }}"
+
+# System configuration
+configure_system_limits: true
+configure_environment: true
+configure_dpkg: true
+configure_snap: true 

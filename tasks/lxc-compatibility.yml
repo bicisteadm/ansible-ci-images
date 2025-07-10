@@ -1,0 +1,60 @@
+---
+# ========================================
+# LXC Compatibility - Create fake files
+# ========================================
+# LXC containers don't have Azure-specific files that the original scripts expect.
+# We create fake versions to prevent script failures.
+
+- name: Create fake /etc/default directory if it doesn't exist
+  file:
+    path: /etc/default
+    state: directory
+    mode: '0755'
+    
+- name: Create fake cloud-init templates directory
+  file:
+    path: /etc/cloud/templates
+    state: directory
+    mode: '0755'
+    
+- name: Create fake waagent.conf
+  copy:
+    content: |
+      # Fake waagent.conf for LXC compatibility
+      # This file is created to prevent Azure-specific scripts from failing
+      Provisioning.Enabled=y
+      Provisioning.DeleteRootPassword=n
+      Provisioning.RegenerateSshHostKeyPair=y
+      Provisioning.SshHostKeyPairType=rsa
+      Provisioning.MonitorHostName=y
+      Provisioning.DecodeCustomData=n
+      Provisioning.ExecuteCustomData=n
+      Provisioning.PasswordCryptId=6
+      Provisioning.PasswordCryptSaltLength=10
+      ResourceDisk.Format=n
+      ResourceDisk.Filesystem=ext4
+      ResourceDisk.MountPoint=/mnt/resource
+      ResourceDisk.MountOptions=None
+      ResourceDisk.EnableSwap=n
+      ResourceDisk.SwapSizeMB=0
+      Logs.Verbose=n
+      OS.RootDeviceScsiTimeout=300
+      OS.OpensslPath=None
+      HttpProxy.Host=None
+      HttpProxy.Port=None
+      AutoUpdate.Enabled=y
+    dest: /etc/waagent.conf
+    mode: '0644'
+    
+- name: Create fake motd-news config
+  copy:
+    content: |
+      # Fake motd-news config for LXC compatibility
+      # This file is created to prevent Azure-specific scripts from failing
+      ENABLED=1
+    dest: /etc/default/motd-news
+    mode: '0644'
+
+- name: Display fake files creation summary
+  debug:
+    msg: "Created fake files for LXC compatibility: waagent.conf, motd-news, cloud-init templates" 

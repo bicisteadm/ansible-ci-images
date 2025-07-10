@@ -1,0 +1,3 @@
+---
+# Variables for azure-pipelines-agent role
+# All variables are defined in defaults/main.yml for easy customization 

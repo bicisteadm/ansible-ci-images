@@ -1,0 +1,133 @@
+---
+# ========================================
+# Programming Languages Installation
+# ========================================
+
+- name: Install Haskell
+  shell: "{{ installer_script_folder }}/install-haskell.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+
+- name: Install Java Tools
+  shell: "{{ installer_script_folder }}/install-java-tools.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+
+- name: Install Kotlin
+  shell: "{{ installer_script_folder }}/install-kotlin.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+
+- name: Install Leiningen
+  shell: "{{ installer_script_folder }}/install-leiningen.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+
+- name: Install Mono
+  shell: "{{ installer_script_folder }}/install-mono.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+
+- name: Install Node.js
+  shell: "{{ installer_script_folder }}/install-nodejs.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+
+- name: Install NVM
+  shell: "{{ installer_script_folder }}/install-nvm.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+
+- name: Install PHP
+  shell: "{{ installer_script_folder }}/install-php.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+
+- name: Install Python
+  shell: "{{ installer_script_folder }}/install-python.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+
+- name: Install PyPy
+  shell: "{{ installer_script_folder }}/install-pypy.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+
+- name: Install Ruby
+  shell: "{{ installer_script_folder }}/install-ruby.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+
+- name: Install Rust
+  shell: "{{ installer_script_folder }}/install-rust.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+
+- name: Install Julia
+  shell: "{{ installer_script_folder }}/install-julia.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+
+- name: Install R Language
+  shell: "{{ installer_script_folder }}/install-rlang.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+
+- name: Install SBT
+  shell: "{{ installer_script_folder }}/install-sbt.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+
+- name: Install toolset via PowerShell
+  shell: "pwsh -f {{ installer_script_folder }}/Install-Toolset.ps1"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+
+- name: Configure toolset via PowerShell
+  shell: "pwsh -f {{ installer_script_folder }}/Configure-Toolset.ps1"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+
+- name: Install pipx packages
+  shell: "{{ installer_script_folder }}/install-pipx-packages.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+
+- name: Install Miniconda
+  shell: "{{ installer_script_folder }}/install-miniconda.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}" 

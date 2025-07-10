@@ -1,0 +1,32 @@
+---
+# ========================================
+# Azure Tools Installation
+# ========================================
+
+- name: Install AzCopy
+  shell: "{{ installer_script_folder }}/install-azcopy.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+
+- name: Install Azure CLI
+  shell: "{{ installer_script_folder }}/install-azure-cli.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+
+- name: Install Azure DevOps CLI
+  shell: "{{ installer_script_folder }}/install-azure-devops-cli.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}"
+
+- name: Install Bicep
+  shell: "{{ installer_script_folder }}/install-bicep.sh"
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+    DEBIAN_FRONTEND: "{{ debian_frontend }}" 

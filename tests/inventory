@@ -1,0 +1,5 @@
+[test-containers]
+localhost ansible_connection=local
+
+[test-containers:vars]
+ansible_python_interpreter=/usr/bin/python3 

@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        ansible-version: ['2.9', '2.10', '2.11', '2.12']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install ansible==${{ matrix.ansible-version }}
+        pip install ansible-lint
+        pip install molecule[docker]
+        
+    - name: Run ansible-lint
+      run: |
+        ansible-lint .
+        
+    - name: Test role syntax
+      run: |
+        ansible-playbook tests/test.yml --syntax-check
+        
+    - name: Run basic tests
+      run: |
+        ansible-playbook tests/test.yml --check
+        
+  security:
+    runs-on: ubuntu-22.04
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Run security checks
+      uses: securecodewarrior/github-action-add-sarif@v1
+      with:
+        sarif-file: 'security-results.sarif'
+        
+  documentation:
+    runs-on: ubuntu-22.04
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Check documentation
+      run: |
+        # Zkontroluje, zda existuje README.md a obsahuje základní sekce
+        if [ ! -f README.md ]; then
+          echo "README.md not found"
+          exit 1
+        fi
+        
+        # Zkontroluje základní sekce v README
+        grep -q "## Přehled" README.md || (echo "Missing Přehled section" && exit 1)
+        grep -q "## Požadavky" README.md || (echo "Missing Požadavky section" && exit 1)
+        grep -q "## Použití" README.md || (echo "Missing Použití section" && exit 1)
+        
+        echo "Documentation check passed" 

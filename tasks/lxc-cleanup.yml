@@ -1,0 +1,26 @@
+---
+# ========================================
+# LXC Compatibility - Cleanup fake files
+# ========================================
+# Remove all fake files that were created for LXC compatibility
+
+- name: Remove fake files
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/waagent.conf
+    - /etc/default/motd-news
+    
+- name: Remove fake directories (if empty)
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/cloud/templates
+    - /etc/cloud
+  ignore_errors: true
+  
+- name: Display cleanup summary
+  debug:
+    msg: "Cleaned up fake files created for LXC compatibility" 
