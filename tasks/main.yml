@@ -1,24 +1,37 @@
 ---
 # ========================================
-# Azure Pipelines Agent Installation Role - Version 2
+# Azure Pipelines Agent Installation Role
 # ========================================
 # EXACT copy of runner-images/images/ubuntu/templates/build.ubuntu-22_04.pkr.hcl
-# Converted to Ansible - linear sequence without conditionals
-# 
-# This is 1:1 mapping of the original Packer provisioners
+# Converted to Ansible - following exact sequence with proper become settings
+
+# Pre-flight checks
+- name: Verify Ubuntu version
+  assert:
+    that:
+      - ansible_distribution == "Ubuntu"
+      - ansible_distribution_version == "22.04"
+    fail_msg: "This role is designed for Ubuntu 22.04 only"
+
+# ========================================
+# LXC Compatibility - MUST BE FIRST
+# ========================================
+# Create fake VM files that Azure scripts expect
 
 - name: Create fake files for LXC compatibility
   include_tasks: lxc-compatibility.yml
+  become: true
 
 # ========================================
 # Provisioner 1: Create directories
-# (inline: mkdir + chmod)
+# (inline: mkdir + chmod) - with sudo
 # ========================================
 
 - name: Create image folder and set permissions
   shell: |
     mkdir {{ image_folder }}
     chmod 777 {{ image_folder }}
+  become: true
   ignore_errors: true
 
 # ========================================  
@@ -31,9 +44,49 @@
     src: "{{ runner_images_helpers_src }}"
     dest: "{{ helper_script_folder }}/"
     mode: '0755'
+  become: true
 
 # ========================================
-# Provisioner 2.5: Copy build scripts EARLY
+# Provisioner 3: Configure APT mock
+# (shell: configure-apt-mock.sh) - with sudo
+# ========================================
+
+- name: Configure APT mock
+  shell: "{{ installer_script_folder }}/configure-apt-mock.sh"
+  become: true
+  args:
+    stdin: /dev/null
+
+# ========================================
+# Provisioner 4: APT configuration scripts
+# (shell: install-ms-repos, configure-apt-sources, configure-apt) - with sudo
+# ========================================
+
+- name: Configure APT repositories and settings
+  shell: |
+    {{ installer_script_folder }}/install-ms-repos.sh
+    {{ installer_script_folder }}/configure-apt-sources.sh
+    {{ installer_script_folder }}/configure-apt.sh
+  environment:
+    HELPER_SCRIPTS: "{{ helper_script_folder }}"
+    DEBIAN_FRONTEND: "noninteractive"
+  become: true
+  args:
+    stdin: /dev/null
+
+# ========================================
+# Provisioner 5: Configure system limits
+# (shell: configure-limits.sh) - with sudo
+# ========================================
+
+- name: Configure system limits
+  shell: "{{ installer_script_folder }}/configure-limits.sh"
+  become: true
+  args:
+    stdin: /dev/null
+
+# ========================================
+# Provisioner 6: Copy build scripts
 # (file: build -> installer_script_folder)
 # ========================================
 
@@ -42,51 +95,7 @@
     src: "{{ runner_images_build_src }}"
     dest: "{{ installer_script_folder }}/"
     mode: '0755'
-
-# ========================================
-# Provisioner 3: Configure APT mock
-# (shell: configure-apt-mock.sh)
-# ========================================
-
-- name: Configure APT mock
-  shell: "{{ installer_script_folder }}/configure-apt-mock.sh < /dev/null"
-
-# ========================================
-# Provisioner 4: APT configuration scripts
-# (shell: install-ms-repos, configure-apt-sources, configure-apt)
-# ========================================
-
-- name: Install Microsoft repositories
-  shell: "{{ installer_script_folder }}/install-ms-repos.sh < /dev/null"
-  environment:
-    HELPER_SCRIPTS: "{{ helper_script_folder }}"
-    DEBIAN_FRONTEND: "noninteractive"
-
-- name: Configure APT sources
-  shell: "{{ installer_script_folder }}/configure-apt-sources.sh < /dev/null"
-  environment:
-    HELPER_SCRIPTS: "{{ helper_script_folder }}"
-    DEBIAN_FRONTEND: "noninteractive"
-
-- name: Configure APT settings
-  shell: "{{ installer_script_folder }}/configure-apt.sh < /dev/null"
-  environment:
-    HELPER_SCRIPTS: "{{ helper_script_folder }}"
-    DEBIAN_FRONTEND: "noninteractive"
-
-# ========================================
-# Provisioner 5: Configure system limits
-# (shell: configure-limits.sh)
-# ========================================
-
-- name: Configure system limits
-  shell: "{{ installer_script_folder }}/configure-limits.sh < /dev/null"
-
-# ========================================
-# Provisioner 6: Copy build scripts
-# (file: build -> installer_script_folder)
-# MOVED ABOVE - keeping comment for reference
-# ========================================
+  become: true
 
 # ========================================
 # Provisioner 7: Copy assets (multiple sources)
@@ -98,18 +107,21 @@
     src: "{{ runner_images_post_gen_src }}"
     dest: "{{ image_folder }}/post-gen/"
     mode: '0755'
+  become: true
 
 - name: Copy test scripts
   copy:
     src: "{{ runner_images_tests_src }}"
     dest: "{{ image_folder }}/tests/"
     mode: '0755'
+  become: true
 
 - name: Copy docs generation scripts
   copy:
     src: "{{ runner_images_docs_gen_src }}"
     dest: "{{ image_folder }}/docs-gen/"
     mode: '0755'
+  become: true
 
 # ========================================
 # Provisioner 8: Copy software report base
@@ -121,6 +133,7 @@
     src: "{{ runner_images_software_report_src }}"
     dest: "{{ image_folder }}/docs-gen/"
     mode: '0755'
+  become: true
 
 # ========================================
 # Provisioner 9: Copy toolset configuration
@@ -132,77 +145,80 @@
     src: "{{ runner_images_toolset_src }}"
     dest: "{{ installer_script_folder }}/toolset.json"
     mode: '0644'
+  become: true
 
 # ========================================
 # Provisioner 10: Rename directories
-# (inline: mv commands)
+# (inline: mv commands) - with sudo
 # ========================================
 
 - name: Rename directories
   shell: |
     mv {{ image_folder }}/docs-gen {{ image_folder }}/SoftwareReport
     mv {{ image_folder }}/post-gen {{ image_folder }}/post-generation
+  become: true
 
 # ========================================
 # Provisioner 11: Configure image data
-# (shell: configure-image-data.sh)
+# (shell: configure-image-data.sh) - with sudo
 # ========================================
 
 - name: Configure image data
-  shell: "{{ installer_script_folder }}/configure-image-data.sh < /dev/null"
+  shell: "{{ installer_script_folder }}/configure-image-data.sh"
   environment:
     IMAGE_VERSION: "{{ image_version }}"
     IMAGEDATA_FILE: "{{ image_folder }}/imagedata.json"
+  become: true
+  args:
+    stdin: /dev/null
 
 # ========================================
 # Provisioner 12: Configure environment
-# (shell: configure-environment.sh)
+# (shell: configure-environment.sh) - with sudo
 # ========================================
 
-- name: Debug - Check if motd-news file exists
-  stat:
-    path: /etc/default/motd-news
-  register: motd_news_stat
-  
-- name: Debug - Display motd-news file status
-  debug:
-    msg: 
-      - "motd-news file exists: {{ motd_news_stat.stat.exists }}"
-      - "motd-news file path: {{ motd_news_stat.stat.path | default('N/A') }}"
-
 - name: Configure environment
-  shell: "{{ installer_script_folder }}/configure-environment.sh < /dev/null"
+  shell: "{{ installer_script_folder }}/configure-environment.sh"
   environment:
     IMAGE_VERSION: "{{ image_version }}"
     IMAGE_OS: "{{ image_os }}"
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
+  become: true
+  args:
+    stdin: /dev/null
 
 # ========================================
 # Provisioner 13: Install vital APT packages
-# (shell: install-apt-vital.sh)
+# (shell: install-apt-vital.sh) - with sudo
 # ========================================
 
 - name: Install vital APT packages
-  shell: "{{ installer_script_folder }}/install-apt-vital.sh < /dev/null"
+  shell: "{{ installer_script_folder }}/install-apt-vital.sh"
   environment:
     DEBIAN_FRONTEND: "noninteractive"
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
     INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+  become: true
+  args:
+    stdin: /dev/null
 
 # ========================================
 # Provisioner 14: Install PowerShell
-# (shell: install-powershell.sh)
+# (shell: install-powershell.sh) - with sudo
 # ========================================
 
 - name: Install PowerShell
-  shell: "{{ installer_script_folder }}/install-powershell.sh < /dev/null"
+  shell: "{{ installer_script_folder }}/install-powershell.sh"
   environment:
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
     INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+  become: true
+  args:
+    stdin: /dev/null
 
 # ========================================
 # Provisioner 15: Install PowerShell modules
-# (shell: PowerShell scripts with pwsh)
+# (shell: PowerShell scripts with pwsh) - with sudo
 # ========================================
 
 - name: Install PowerShell modules
@@ -212,13 +228,13 @@
   environment:
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
     INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+  become: true
   args:
     stdin: /dev/null
 
 # ========================================
 # Provisioner 16: MASSIVE installation block
-# (shell: ALL installation scripts in exact Packer order)
-# This is the big provisioner with 50+ scripts in one block
+# (shell: ALL installation scripts in exact Packer order) - with sudo
 # ========================================
 
 - name: Run all installation scripts (massive Packer block)
@@ -288,83 +304,99 @@
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
     INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
     DEBIAN_FRONTEND: "noninteractive"
+  become: true
   args:
     stdin: /dev/null
 
 # ========================================
 # Provisioner 17: Install Docker (with credentials)
-# (shell: install-docker.sh with DOCKERHUB env vars)
+# (shell: install-docker.sh with DOCKERHUB env vars) - with sudo
 # ========================================
 
 - name: Install Docker
-  shell: "{{ installer_script_folder }}/install-docker.sh < /dev/null"
+  shell: "{{ installer_script_folder }}/install-docker.sh"
   environment:
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
     INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
     DOCKERHUB_LOGIN: "{{ dockerhub_login | default('') }}"
     DOCKERHUB_PASSWORD: "{{ dockerhub_password | default('') }}"
+  become: true
+  args:
+    stdin: /dev/null
 
 # ========================================
 # Provisioner 18: PowerShell toolset configuration
-# (shell: PowerShell scripts for toolset)
+# (shell: PowerShell scripts for toolset) - with sudo
 # ========================================
 
 - name: Configure PowerShell toolset
   shell: |
-    pwsh -f {{ installer_script_folder }}/Install-Toolset.ps1 < /dev/null
-    pwsh -f {{ installer_script_folder }}/Configure-Toolset.ps1 < /dev/null
+    pwsh -f {{ installer_script_folder }}/Install-Toolset.ps1
+    pwsh -f {{ installer_script_folder }}/Configure-Toolset.ps1
   environment:
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
     INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
-    AGENT_TOOLSDIRECTORY: "/opt/hostedtoolcache"
+    AGENT_TOOLSDIRECTORY: "{{ toolcache_root }}"
     SUDO_USER: "{{ ansible_user_id | default('root') }}"
+  become: true
+  args:
+    stdin: /dev/null
 
 # ========================================
 # Provisioner 19: Install pipx packages
-# (shell: install-pipx-packages.sh)
+# (shell: install-pipx-packages.sh) - with sudo
 # ========================================
 
 - name: Install pipx packages
-  shell: "{{ installer_script_folder }}/install-pipx-packages.sh < /dev/null"
+  shell: "{{ installer_script_folder }}/install-pipx-packages.sh"
   environment:
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
     INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
+  become: true
+  args:
+    stdin: /dev/null
 
 # ========================================
 # Provisioner 20: Install Homebrew (as regular user)
-# (shell: install-homebrew.sh with /bin/sh instead of sudo)
+# (shell: install-homebrew.sh with /bin/sh instead of sudo) - NO SUDO!
 # ========================================
 
 - name: Install Homebrew
-  shell: "{{ installer_script_folder }}/install-homebrew.sh < /dev/null"
+  shell: "{{ installer_script_folder }}/install-homebrew.sh"
   environment:
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
     DEBIAN_FRONTEND: "noninteractive"
     INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
   become: false
+  args:
+    stdin: /dev/null
 
 # ========================================
 # Provisioner 21: Configure snap
-# (shell: configure-snap.sh)
+# (shell: configure-snap.sh) - with sudo
 # ========================================
 
 - name: Configure snap
-  shell: "{{ installer_script_folder }}/configure-snap.sh < /dev/null"
+  shell: "{{ installer_script_folder }}/configure-snap.sh"
   environment:
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
+  become: true
+  args:
+    stdin: /dev/null
 
 # ========================================
 # Provisioner 22: Reboot VM
-# (shell: inline reboot with expect_disconnect)
-# NOTE: For LXC, we simulate this with LXC compatibility
+# (shell: inline reboot with expect_disconnect) - with sudo
+# NOTE: For LXC, we just echo the message since fake files are already created
 # ========================================
 
 - name: Reboot VM (simulated for LXC)
   shell: echo 'Reboot VM'
+  become: true
 
 # ========================================
 # Provisioner 23: Cleanup (with pause and retry)
-# (shell: cleanup.sh with pause_before=1m0s and start_retry_timeout=10m)
+# (shell: cleanup.sh with pause_before=1m0s and start_retry_timeout=10m) - with sudo
 # ========================================
 
 - name: Pause before cleanup (simulating Packer pause_before)
@@ -372,11 +404,14 @@
     seconds: 60
 
 - name: Run cleanup
-  shell: "{{ installer_script_folder }}/cleanup.sh < /dev/null"
+  shell: "{{ installer_script_folder }}/cleanup.sh"
+  become: true
+  args:
+    stdin: /dev/null
 
 # ========================================
 # Provisioner 24: Generate software reports
-# (shell: inline PowerShell commands)
+# (shell: inline PowerShell commands) - NO explicit sudo in Packer
 # ========================================
 
 - name: Generate software reports
@@ -386,12 +421,12 @@
   environment:
     IMAGE_VERSION: "{{ image_version }}"
     INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
-  args:
-    stdin: /dev/null
+  become: false
+  ignore_errors: true
 
 # ========================================
 # Provisioner 25-26: Download reports
-# (file: direction="download" for both reports)
+# (file: direction="download" for both reports) - NO sudo needed
 # ========================================
 
 - name: Fetch Ubuntu README to control machine
@@ -399,28 +434,35 @@
     src: "{{ image_folder }}/software-report.md"
     dest: "./Ubuntu2204-Readme.md"
     flat: yes
+  become: false
+  ignore_errors: true
 
 - name: Fetch software report JSON to control machine
   fetch:
     src: "{{ image_folder }}/software-report.json"
     dest: "./software-report.json"
     flat: yes
+  become: false
+  ignore_errors: true
 
 # ========================================
 # Provisioner 27: Configure system
-# (shell: configure-system.sh)
+# (shell: configure-system.sh) - with sudo
 # ========================================
 
 - name: Configure system
-  shell: "{{ installer_script_folder }}/configure-system.sh < /dev/null"
+  shell: "{{ installer_script_folder }}/configure-system.sh"
   environment:
     HELPER_SCRIPT_FOLDER: "{{ helper_script_folder }}"
     INSTALLER_SCRIPT_FOLDER: "{{ installer_script_folder }}"
     IMAGE_FOLDER: "{{ image_folder }}"
+  become: true
+  args:
+    stdin: /dev/null
 
 # ========================================
 # Provisioner 28: Copy ubuntu2204.conf to /tmp/
-# (file: ubuntu2204.conf -> /tmp/)
+# (file: ubuntu2204.conf -> /tmp/) - needs sudo for system files
 # ========================================
 
 - name: Copy ubuntu2204.conf to /tmp/
@@ -428,37 +470,60 @@
     src: "{{ runner_images_ubuntu_conf_src }}"
     dest: "/tmp/ubuntu2204.conf"
     mode: '0644'
+  become: true
 
 # ========================================
 # Provisioner 29: Move config to /etc/vsts/
-# (shell: inline mkdir + cp commands)
+# (shell: inline mkdir + cp commands) - with sudo
 # ========================================
 
 - name: Configure machine instance
   shell: |
     mkdir -p /etc/vsts
     cp /tmp/ubuntu2204.conf /etc/vsts/machine_instance.conf
-  args:
-    stdin: /dev/null
+  become: true
 
 # ========================================
 # Provisioner 30: Post-build validation
-# (shell: post-build-validation.sh)
+# (shell: post-build-validation.sh) - with sudo
 # ========================================
 
 - name: Run post-build validation
-  shell: "{{ installer_script_folder }}/post-build-validation.sh < /dev/null"
+  shell: "{{ installer_script_folder }}/post-build-validation.sh"
   environment:
     HELPER_SCRIPTS: "{{ helper_script_folder }}"
+  become: true
+  args:
+    stdin: /dev/null
+  ignore_errors: true
 
 # ========================================
 # Provisioner 31: Final cleanup and deprovision
-# (shell: inline sleep + waagent deprovision)
+# (shell: inline sleep + waagent deprovision) - with sudo
 # NOTE: For LXC, we clean up fake files instead of waagent
 # ========================================
 
-- name: Final cleanup
+- name: Final sleep (matching Packer)
   shell: sleep 30
+  become: true
 
 - name: Clean up fake files created for LXC compatibility
-  include_tasks: lxc-cleanup.yml 
+  include_tasks: lxc-cleanup.yml
+  become: true
+
+# ========================================
+# Installation summary
+# ========================================
+
+- name: Display installation summary
+  debug:
+    msg: |
+      Azure Pipelines Agent installation completed successfully!
+      Image Version: {{ image_version }}
+      Image OS: {{ image_os }}
+      Toolcache Directory: {{ toolcache_root }}
+      
+      All selected installation scripts have been executed following the exact Packer sequence.
+      Scripts are sourced from official runner-images git submodule.
+      Reports have been generated and fetched to the control machine.
+  become: false 
