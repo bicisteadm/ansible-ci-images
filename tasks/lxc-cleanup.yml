@@ -8,18 +8,21 @@
   file:
     path: /etc/default/motd-news
     state: absent
+  become: true
   ignore_errors: true
 
 - name: Remove fake waagent.conf
   file:
     path: /etc/waagent.conf
     state: absent
+  become: true
   ignore_errors: true
 
 - name: Remove fake cloud-init templates directory
   file:
     path: /etc/cloud/templates
     state: absent
+  become: true
   ignore_errors: true
 
 - name: Remove fake Azure agent files
@@ -28,4 +31,5 @@
     state: absent
   loop:
     - /var/lib/waagent
+  become: true
   ignore_errors: true

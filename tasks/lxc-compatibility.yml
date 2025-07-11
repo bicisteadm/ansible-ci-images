@@ -10,6 +10,7 @@
     path: /etc/default
     state: directory
     mode: '0755'
+  become: true
 
 - name: Create fake motd-news configuration
   copy:
@@ -19,12 +20,14 @@
       ENABLED=0
     dest: /etc/default/motd-news
     mode: '0644'
+  become: true
     
 - name: Create fake cloud-init templates directory
   file:
     path: /etc/cloud/templates
     state: directory
     mode: '0755'
+  become: true
 
 - name: Create fake waagent.conf
   copy:
@@ -53,9 +56,11 @@
       AutoUpdate.Enabled=y
     dest: /etc/waagent.conf
     mode: '0644'
+  become: true
     
 - name: Create fake azure agent directory
   file:
     path: /var/lib/waagent
     state: directory
     mode: '0755'
+  become: true

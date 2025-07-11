@@ -20,7 +20,6 @@
 
 - name: Create fake files for LXC compatibility
   include_tasks: lxc-compatibility.yml
-  become: true
 
 # ========================================
 # Provisioner 1: Create directories
@@ -509,7 +508,6 @@
 
 - name: Clean up fake files created for LXC compatibility
   include_tasks: lxc-cleanup.yml
-  become: true
 
 # ========================================
 # Installation summary
